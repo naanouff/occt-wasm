@@ -3,3 +3,6 @@
 /OCCT
 *.wasm
 node_modules
+certs/*.crt
+emsdk-cache/*
+!emsdk-cache/.gitkeep

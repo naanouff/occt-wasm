@@ -1,0 +1,89 @@
+# syntax=docker/dockerfile:1
+# Same build as the Dockerfile, for a machine where in-container downloads fail.
+# Requires a host checkout OCCT/ already at OCCT_SHA, and emsdk archives in
+# emsdk-cache/ (cpython tarball plus the emsdk *.tar.xz downloads).
+# certs/extra-ca.crt is optional and not committed: a local TLS-inspection CA.
+FROM node:22-bullseye
+
+SHELL ["/bin/bash", "-lc"]
+
+RUN --mount=type=bind,source=certs,target=/opt/host-certs \
+    --mount=type=bind,source=emsdk-cache,target=/opt/emsdk-cache \
+  printf 'deb http://archive.debian.org/debian bullseye main\n' > /etc/apt/sources.list \
+  && apt-get -o Acquire::Check-Valid-Until=false -o Acquire::By-Hash=false update \
+  && apt-get install -y --no-install-recommends \
+       git ca-certificates python3 cmake ninja-build xz-utils bzip2 \
+  && rm -rf /var/lib/apt/lists/* \
+  && if [ -f /opt/host-certs/extra-ca.crt ]; then \
+       cp /opt/host-certs/extra-ca.crt /usr/local/share/ca-certificates/extra-ca.crt \
+       && update-ca-certificates; \
+     fi \
+  && export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+  && export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+  && export GIT_SSL_CAINFO=/etc/ssl/certs/ca-certificates.crt \
+  && unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY \
+  && mkdir -p /opt \
+  && tar -xzf /opt/emsdk-cache/cpython-3.12.15.tar.gz -C /opt \
+  && ln -sfn /opt/python/bin/python3 /usr/local/bin/python3 \
+  && ln -sfn /opt/python/bin/python3 /usr/local/bin/python \
+  && python3 --version \
+  && git clone --depth 1 --branch 6.0.11 https://github.com/emscripten-core/emsdk.git /emsdk \
+  && mkdir -p /emsdk/downloads \
+  && cp -a /opt/emsdk-cache/*.tar.xz /emsdk/downloads/ \
+  && EMSDK_KEEP_DOWNLOADS=1 /emsdk/emsdk install 6.0.11 \
+  && /emsdk/emsdk activate 6.0.11
+
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+ENV GIT_SSL_CAINFO=/etc/ssl/certs/ca-certificates.crt
+ENV EMSDK=/emsdk
+ENV EM_CONFIG=/emsdk/.emscripten
+ENV PATH="/opt/python/bin:/emsdk:/emsdk/upstream/emscripten:/emsdk/upstream/bin:${PATH}"
+
+WORKDIR /src
+COPY versions.env CMakeLists.txt package.json /src/
+COPY scripts /src/scripts
+COPY src /src/src
+
+# OCCT sources are cloned on the host (OCCT/, not committed). In-container
+# git clone is cut off by local TLS inspection on the packfile.
+RUN --mount=type=bind,source=OCCT,target=/src/OCCT,rw \
+    --mount=type=cache,id=occt-emsdk6,target=/build \
+  set -eo pipefail \
+  && source /emsdk/emsdk_env.sh \
+  && export PATH="/emsdk/upstream/bin:${PATH}" \
+  && set -u \
+  && source /src/versions.env \
+  && test "$(git -C /src/OCCT rev-parse HEAD)" = "${OCCT_SHA}" \
+  && bash /src/scripts/configure-occt.sh \
+  && echo "occt build start" \
+  && (cmake --build /build/occt --target install -j4 > /tmp/occt-build.log \
+      || cmake --build /build/occt --target install -j2 > /tmp/occt-build.log \
+      || { tail -n 120 /tmp/occt-build.log; exit 1; }) \
+  && echo "occt build done" \
+  && cmake_dir="$(find /opt/occt -name OpenCASCADEConfig.cmake | head -n 1)" \
+  && test -n "${cmake_dir}" \
+  && mkdir -p /opt/occt-res \
+  && cp -a /src/OCCT/resources/XSTEPResource /opt/occt-res/XSTEPResource \
+  && cp -a /src/OCCT/resources/SHMessage /opt/occt-res/SHMessage \
+  && emcmake cmake -S /src -B /build/api -G Ninja \
+       -DCMAKE_BUILD_TYPE=Release \
+       -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
+       -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-O1" \
+       -DOpenCASCADE_DIR="$(dirname "${cmake_dir}")" \
+       -DOCCT_RES=/opt/occt-res \
+  && echo "api build start" \
+  && (cmake --build /build/api -j4 > /tmp/api-build.log \
+      || cmake --build /build/api -j2 > /tmp/api-build.log \
+      || { tail -n 120 /tmp/api-build.log; exit 1; }) \
+  && echo "api build done" \
+  && mkdir -p /opt/dist \
+  && cp /build/api/occt-step.js /build/api/occt-step.wasm /build/api/link-libs.txt /opt/dist/ \
+  && cp /src/OCCT/LICENSE_LGPL_21.txt /src/OCCT/OCCT_LGPL_EXCEPTION.txt /opt/dist/ \
+  && if wasm-opt -O1 /opt/dist/occt-step.wasm -o /tmp/occt-step.opt.wasm; then \
+       mv /tmp/occt-step.opt.wasm /opt/dist/occt-step.wasm; \
+       echo "wasm-opt -O1 applied"; \
+     else \
+       echo "wasm-opt skipped"; \
+     fi \
+  && ! grep -q TKOpenGl /opt/dist/link-libs.txt

@@ -32,18 +32,25 @@ const occt = await moduleFactory({
   locateFile: (path) => (path.endsWith('.wasm') ? wasmPath : path),
 });
 const initMs = Date.now() - started;
-const readStep = occt.cwrap('occt_read_step', 'number', ['number', 'number', 'string']);
-const freePtr = occt.cwrap('occt_free', null, ['number']);
+if (typeof occt._occt_read_step !== 'function' || typeof occt._occt_free !== 'function') {
+  console.error('occt-step.js does not export _occt_read_step and _occt_free');
+  process.exit(1);
+}
 
 const gaps = [];
 for (const stepPath of stepArgs) {
   const bytes = new Uint8Array(await readFile(stepPath));
+  const encoded = new TextEncoder().encode('normal');
   const ptr = occt._malloc(bytes.length);
+  const presetPtr = occt._malloc(encoded.length + 1);
   occt.HEAPU8.set(bytes, ptr);
-  const outPtr = readStep(ptr, bytes.length, 'normal');
+  occt.HEAPU8.set(encoded, presetPtr);
+  occt.HEAPU8[presetPtr + encoded.length] = 0;
+  const outPtr = occt._occt_read_step(ptr, bytes.length, presetPtr);
   occt._free(ptr);
+  occt._free(presetPtr);
   const json = JSON.parse(occt.UTF8ToString(outPtr));
-  freePtr(outPtr);
+  occt._occt_free(outPtr);
   const name = basename(stepPath);
   console.log(name, {
     ok: json.ok,
@@ -79,4 +86,4 @@ const report = [
 ].join('\n');
 await writeFile(join(dist, 'GAPS.md'), report);
 console.log(report);
-if (gaps.some((gap) => !gap.includes('MODEL_GEOMETRIC_VIEW'))) process.exit(1);
+if (gaps.length > 0) process.exit(1);

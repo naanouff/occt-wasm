@@ -3,6 +3,8 @@
  * Mesh-only STEPControl_Reader is not this API.
  */
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -11,9 +13,16 @@
 #include <string>
 #include <vector>
 
+#include <Bnd_Box.hxx>
+#include <BRepAdaptor_Curve.hxx>
+#include <BRepBndLib.hxx>
 #include <CDM_Document.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRep_Tool.hxx>
+#include <GCPnts_QuasiUniformDeflection.hxx>
+#include <Quantity_Color.hxx>
+#include <XCAFDoc_ColorTool.hxx>
+#include <XCAFDoc_ColorType.hxx>
 #include <IFSelect_ReturnStatus.hxx>
 #include <Poly_Triangulation.hxx>
 #include <STEPCAFControl_Reader.hxx>
@@ -116,50 +125,193 @@ Quality qualityFor(const char* preset) {
 
 struct MeshBuffers {
   std::string name;
+  int shapeIndex = 0;
+  int face = 0;
+  bool hasColor = false;
+  double red = 0;
+  double green = 0;
+  double blue = 0;
   std::vector<double> positions;
   std::vector<double> normals;
   std::vector<int> indices;
 };
 
-void appendShapeMesh(const TopoDS_Shape& shape, const std::string& name, double scale, MeshBuffers& mesh) {
-  mesh.name = name;
-  for (TopExp_Explorer exp(shape, TopAbs_FACE); exp.More(); exp.Next()) {
-    const TopoDS_Face face = TopoDS::Face(exp.Current());
-    TopLoc_Location loc;
-    occ::handle<Poly_Triangulation> tri = BRep_Tool::Triangulation(face, loc);
-    if (tri.IsNull()) continue;
-    const gp_Trsf trsf = loc.Transformation();
-    const int base = static_cast<int>(mesh.positions.size() / 3);
-    const int nbNodes = tri->NbNodes();
-    std::vector<gp_Pnt> nodes(static_cast<size_t>(nbNodes));
-    for (int i = 1; i <= nbNodes; ++i) {
-      gp_Pnt p = tri->Node(i);
-      if (!loc.IsIdentity()) p.Transform(trsf);
-      nodes[static_cast<size_t>(i - 1)] = p;
-      mesh.positions.push_back(p.X() * scale);
-      mesh.positions.push_back(p.Y() * scale);
-      mesh.positions.push_back(p.Z() * scale);
-      mesh.normals.push_back(0);
-      mesh.normals.push_back(0);
-      mesh.normals.push_back(1);
+bool readSurfaceColor(
+    const occ::handle<XCAFDoc_ColorTool>& colors,
+    const TopoDS_Shape& shape,
+    Quantity_Color& out) {
+  if (colors.IsNull() || shape.IsNull()) return false;
+  if (colors->GetInstanceColor(shape, XCAFDoc_ColorSurf, out)) return true;
+  if (colors->GetColor(shape, XCAFDoc_ColorSurf, out)) return true;
+  if (colors->GetInstanceColor(shape, XCAFDoc_ColorGen, out)) return true;
+  if (colors->GetColor(shape, XCAFDoc_ColorGen, out)) return true;
+  return false;
+}
+
+double edgeDeflection(const TopoDS_Shape& shape, double relative) {
+  Bnd_Box box;
+  BRepBndLib::Add(shape, box);
+  if (box.IsVoid()) return std::max(relative, 1e-4);
+  double xmin = 0, ymin = 0, zmin = 0, xmax = 0, ymax = 0, zmax = 0;
+  box.Get(xmin, ymin, zmin, xmax, ymax, zmax);
+  const double diag = std::sqrt(
+      (xmax - xmin) * (xmax - xmin) + (ymax - ymin) * (ymax - ymin) + (zmax - zmin) * (zmax - zmin));
+  return std::max(relative * (diag > 1e-9 ? diag : 1.0), 1e-6);
+}
+
+void pushPoint(std::vector<double>& wire, const gp_Pnt& point) {
+  wire.push_back(point.X());
+  wire.push_back(point.Y());
+  wire.push_back(point.Z());
+}
+
+void appendEdgePolyline(const TopoDS_Edge& edge, double deflection, std::vector<double>& wire) {
+  if (BRep_Tool::Degenerated(edge)) return;
+  BRepAdaptor_Curve curve(edge);
+  GCPnts_QuasiUniformDeflection sampler(curve, deflection);
+  if (sampler.IsDone() && sampler.NbPoints() >= 2) {
+    for (int i = 1; i < sampler.NbPoints(); ++i) {
+      pushPoint(wire, sampler.Value(i));
+      pushPoint(wire, sampler.Value(i + 1));
     }
-    for (int i = 1; i <= tri->NbTriangles(); ++i) {
-      int n1 = 0, n2 = 0, n3 = 0;
-      tri->Triangle(i).Get(n1, n2, n3);
-      const gp_Pnt& a = nodes[static_cast<size_t>(n1 - 1)];
-      const gp_Pnt& b = nodes[static_cast<size_t>(n2 - 1)];
-      const gp_Pnt& c = nodes[static_cast<size_t>(n3 - 1)];
-      gp_Vec normal(gp_Vec(a, b).Crossed(gp_Vec(a, c)));
-      if (normal.SquareMagnitude() > 1e-20) normal.Normalize();
-      else normal = gp_Vec(0, 0, 1);
-      for (int nodeIndex : {n1, n2, n3}) {
-        const int slot = (base + nodeIndex - 1) * 3;
-        mesh.normals[static_cast<size_t>(slot)] = normal.X();
-        mesh.normals[static_cast<size_t>(slot + 1)] = normal.Y();
-        mesh.normals[static_cast<size_t>(slot + 2)] = normal.Z();
-        mesh.indices.push_back(base + nodeIndex - 1);
+    return;
+  }
+  const gp_Pnt start = curve.Value(curve.FirstParameter());
+  const gp_Pnt end = curve.Value(curve.LastParameter());
+  if (start.Distance(end) < 1e-9) return;
+  pushPoint(wire, start);
+  pushPoint(wire, end);
+}
+
+void appendFaceMesh(
+    const TopoDS_Face& face,
+    const std::string& name,
+    int shapeIndex,
+    int faceId,
+    const Quantity_Color* color,
+    MeshBuffers& mesh);
+
+std::string shapeDisplayName(const TDF_Label& label) {
+  TDF_Label referred;
+  if (XCAFDoc_ShapeTool::GetReferredShape(label, referred)) {
+    const std::string referredName = labelName(referred);
+    if (!referredName.empty() && referredName.rfind("=>[", 0) != 0) return referredName;
+  }
+  const std::string own = labelName(label);
+  return own;
+}
+
+void collectSolidMeshes(
+    const TDF_Label& label,
+    int shapeIndex,
+    const occ::handle<XCAFDoc_ColorTool>& colors,
+    const Quality& quality,
+    std::vector<MeshBuffers>& meshes,
+    std::vector<double>& wireframe,
+    int& nextFace,
+    int& triangleCount) {
+  if (XCAFDoc_ShapeTool::IsAssembly(label)) {
+    NCollection_Sequence<TDF_Label> components;
+    if (XCAFDoc_ShapeTool::GetComponents(label, components, false) && components.Length() > 0) {
+      for (int i = 1; i <= components.Length(); ++i) {
+        collectSolidMeshes(components.Value(i), shapeIndex, colors, quality, meshes, wireframe, nextFace,
+                           triangleCount);
       }
+      return;
     }
+  }
+  TopoDS_Shape shape;
+  if (!XCAFDoc_ShapeTool::GetShape(label, shape) || shape.IsNull()) return;
+  BRepMesh_IncrementalMesh mesher(shape, quality.linear, false, quality.angular, false);
+  mesher.Perform();
+  Quantity_Color inherited;
+  const bool hasInherited = readSurfaceColor(colors, shape, inherited);
+  const std::string shapeName = shapeDisplayName(label);
+  const double deflection = edgeDeflection(shape, quality.linear);
+  for (TopExp_Explorer faces(shape, TopAbs_FACE); faces.More(); faces.Next()) {
+    const TopoDS_Face face = TopoDS::Face(faces.Current());
+    Quantity_Color faceColor;
+    const Quantity_Color* paint = nullptr;
+    if (readSurfaceColor(colors, face, faceColor)) paint = &faceColor;
+    else if (hasInherited) paint = &inherited;
+    MeshBuffers mesh;
+    appendFaceMesh(face, shapeName, shapeIndex, nextFace, paint, mesh);
+    if (mesh.indices.size() < 3) continue;
+    triangleCount += static_cast<int>(mesh.indices.size() / 3);
+    meshes.push_back(std::move(mesh));
+    nextFace += 1;
+  }
+  for (TopExp_Explorer edges(shape, TopAbs_EDGE); edges.More(); edges.Next()) {
+    try {
+      appendEdgePolyline(TopoDS::Edge(edges.Current()), deflection, wireframe);
+    } catch (const Standard_Failure&) {
+    } catch (const std::exception&) {
+    }
+  }
+}
+
+void appendFaceMesh(
+    const TopoDS_Face& face,
+    const std::string& name,
+    int shapeIndex,
+    int faceId,
+    const Quantity_Color* color,
+    MeshBuffers& mesh) {
+  TopLoc_Location loc;
+  const occ::handle<Poly_Triangulation> tri = BRep_Tool::Triangulation(face, loc);
+  if (tri.IsNull() || tri->NbTriangles() < 1 || tri->NbNodes() < 3) return;
+  const gp_Trsf trsf = loc.Transformation();
+  const bool reversed = face.Orientation() == TopAbs_REVERSED;
+  const int nbNodes = tri->NbNodes();
+  std::vector<gp_Pnt> nodes(static_cast<size_t>(nbNodes));
+  std::vector<double> normalSum(static_cast<size_t>(nbNodes) * 3, 0.0);
+  std::vector<int> normalCount(static_cast<size_t>(nbNodes), 0);
+  mesh.name = name;
+  mesh.shapeIndex = shapeIndex;
+  mesh.face = faceId;
+  if (color) {
+    mesh.hasColor = true;
+    mesh.red = color->Red();
+    mesh.green = color->Green();
+    mesh.blue = color->Blue();
+  }
+  for (int i = 1; i <= nbNodes; ++i) {
+    gp_Pnt point = tri->Node(i);
+    if (!loc.IsIdentity()) point.Transform(trsf);
+    nodes[static_cast<size_t>(i - 1)] = point;
+    mesh.positions.push_back(point.X());
+    mesh.positions.push_back(point.Y());
+    mesh.positions.push_back(point.Z());
+  }
+  for (int i = 1; i <= tri->NbTriangles(); ++i) {
+    int n1 = 0, n2 = 0, n3 = 0;
+    tri->Triangle(i).Get(n1, n2, n3);
+    if (reversed) std::swap(n2, n3);
+    if (n1 < 1 || n2 < 1 || n3 < 1 || n1 > nbNodes || n2 > nbNodes || n3 > nbNodes) continue;
+    const gp_Pnt& a = nodes[static_cast<size_t>(n1 - 1)];
+    const gp_Pnt& b = nodes[static_cast<size_t>(n2 - 1)];
+    const gp_Pnt& c = nodes[static_cast<size_t>(n3 - 1)];
+    gp_Vec normal(gp_Vec(a, b).Crossed(gp_Vec(a, c)));
+    if (normal.SquareMagnitude() > 1e-20) normal.Normalize();
+    else normal = gp_Vec(0, 0, 1);
+    for (int nodeIndex : {n1, n2, n3}) {
+      const size_t slot = static_cast<size_t>(nodeIndex - 1) * 3;
+      normalSum[slot] += normal.X();
+      normalSum[slot + 1] += normal.Y();
+      normalSum[slot + 2] += normal.Z();
+      normalCount[static_cast<size_t>(nodeIndex - 1)] += 1;
+      mesh.indices.push_back(nodeIndex - 1);
+    }
+  }
+  mesh.normals.assign(static_cast<size_t>(nbNodes) * 3, 0.0);
+  for (int i = 0; i < nbNodes; ++i) {
+    gp_Vec normal(normalSum[static_cast<size_t>(i) * 3], normalSum[static_cast<size_t>(i) * 3 + 1],
+                  normalSum[static_cast<size_t>(i) * 3 + 2]);
+    if (normalCount[static_cast<size_t>(i)] > 0 && normal.SquareMagnitude() > 1e-20) normal.Normalize();
+    else normal = gp_Vec(0, 0, 1);
+    mesh.normals[static_cast<size_t>(i) * 3] = normal.X();
+    mesh.normals[static_cast<size_t>(i) * 3 + 1] = normal.Y();
+    mesh.normals[static_cast<size_t>(i) * 3 + 2] = normal.Z();
   }
 }
 
@@ -213,6 +365,7 @@ std::string readDocument(const std::string& path, const char* preset) {
 
   const Quality quality = qualityFor(preset);
   occ::handle<XCAFDoc_ShapeTool> shapes = XCAFDoc_DocumentTool::ShapeTool(doc->Main());
+  occ::handle<XCAFDoc_ColorTool> colors = XCAFDoc_DocumentTool::ColorTool(doc->Main());
   occ::handle<XCAFDoc_DimTolTool> dimTol = XCAFDoc_DocumentTool::DimTolTool(doc->Main());
   occ::handle<XCAFDoc_NotesTool> notes = XCAFDoc_DocumentTool::NotesTool(doc->Main());
 
@@ -220,17 +373,12 @@ std::string readDocument(const std::string& path, const char* preset) {
   shapes->GetFreeShapes(freeShapes);
 
   std::vector<MeshBuffers> meshes;
+  std::vector<double> wireframe;
   int triangleCount = 0;
+  int nextFace = 1;
   for (int i = 1; i <= freeShapes.Length(); ++i) {
-    const TDF_Label label = freeShapes.Value(i);
-    TopoDS_Shape shape;
-    if (!XCAFDoc_ShapeTool::GetShape(label, shape) || shape.IsNull()) continue;
-    BRepMesh_IncrementalMesh mesher(shape, quality.linear, false, quality.angular, false);
-    mesher.Perform();
-    MeshBuffers mesh;
-    appendShapeMesh(shape, labelName(label), scale, mesh);
-    triangleCount += static_cast<int>(mesh.indices.size() / 3);
-    meshes.push_back(std::move(mesh));
+    collectSolidMeshes(freeShapes.Value(i), i - 1, colors, quality, meshes, wireframe, nextFace,
+                       triangleCount);
   }
 
   std::ostringstream out;
@@ -311,8 +459,12 @@ std::string readDocument(const std::string& path, const char* preset) {
   for (size_t m = 0; m < meshes.size(); ++m) {
     if (m > 0) out << ',';
     const MeshBuffers& mesh = meshes[m];
-    out << "{\"name\":\"" << jsonEscape(mesh.name) << "\",\"triangleCount\":"
-        << (mesh.indices.size() / 3) << ",\"positions\":[";
+    out << "{\"name\":\"" << jsonEscape(mesh.name) << "\",\"shapeIndex\":" << mesh.shapeIndex
+        << ",\"face\":" << mesh.face << ",\"triangleCount\":" << (mesh.indices.size() / 3);
+    if (mesh.hasColor) {
+      out << ",\"color\":[" << mesh.red << "," << mesh.green << "," << mesh.blue << "]";
+    }
+    out << ",\"positions\":[";
     for (size_t i = 0; i < mesh.positions.size(); ++i) {
       if (i) out << ',';
       out << mesh.positions[i];
@@ -329,7 +481,12 @@ std::string readDocument(const std::string& path, const char* preset) {
     }
     out << "]}";
   }
-  out << "],\"gaps\":[\"MODEL_GEOMETRIC_VIEW non lu par cette API\"]}";
+  out << "],\"wireframe\":[";
+  for (size_t i = 0; i < wireframe.size(); ++i) {
+    if (i) out << ',';
+    out << wireframe[i];
+  }
+  out << "],\"gaps\":[]}";
   return out.str();
 }
 
