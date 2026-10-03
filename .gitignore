@@ -1,0 +1,5 @@
+/build
+/dist
+/OCCT
+*.wasm
+node_modules

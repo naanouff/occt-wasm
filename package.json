@@ -1,0 +1,17 @@
+{
+  "name": "@naanouff/occt-wasm",
+  "version": "0.1.0",
+  "description": "OCCT 8 STEPCAF reader compiled to WebAssembly (mesh, assembly, PMI, GD&T, annotations).",
+  "license": "LGPL-2.1-only",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "dist/occt-step.js",
+  "exports": {
+    ".": "./dist/occt-step.js"
+  },
+  "scripts": {
+    "smoke": "node scripts/smoke.mjs"
+  }
+}

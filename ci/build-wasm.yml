@@ -1,0 +1,23 @@
+name: build-wasm
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build OCCT wasm
+        run: docker build -t occt-wasm .
+      - name: Extract dist
+        run: |
+          docker create --name occt-out occt-wasm
+          docker cp occt-out:/opt/dist dist
+          docker rm occt-out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: occt-step-wasm
+          path: dist
+          if-no-files-found: error
