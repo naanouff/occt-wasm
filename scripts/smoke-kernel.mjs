@@ -3,16 +3,15 @@
  * Smoke occt-kernel: box → tessellate → triangleCount > 0.
  * Writes dist/GAPS-kernel.md with init time and wasm size.
  */
-import { writeFile, stat } from 'node:fs/promises';
+import { readFile, writeFile, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const dist = join(dirname(new URL(import.meta.url).pathname), '..', 'dist');
+const dist = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const jsPath = join(dist, 'occt-kernel.js');
 const wasmPath = join(dist, 'occt-kernel.wasm');
 const libsPath = join(dist, 'link-libs.txt');
 
-const { readFile } = await import('node:fs/promises');
 const libs = await readFile(libsPath, 'utf8');
 if (/TKOpenGl/i.test(libs)) {
   console.error('link-libs.txt contains TKOpenGl');
