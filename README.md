@@ -35,4 +35,21 @@ node scripts/smoke.mjs chemin/nist_ctc_01_asme1_ap242-e1.stp chemin/autre.stp
 
 Le rapport `dist/GAPS.md` note la taille du wasm, le temps d’init, et les trous.
 
-Le fichier [`ci/build-wasm.yml`](ci/build-wasm.yml) est le job manuel (`workflow_dispatch`). GitHub refuse de le poser dans `.github/workflows` tant que le jeton n’a pas le scope `workflow`. Pour l’activer : copier ce fichier vers `.github/workflows/build-wasm.yml` avec un jeton qui a ce scope.
+## Gitflow
+
+```text
+feature/* | fix/*  →  develop  →  main  →  tag v* (Release)
+```
+
+Détail : [`docs/gitflow.md`](docs/gitflow.md).
+
+## CI et Release
+
+Le workflow [`.github/workflows/build-wasm.yml`](.github/workflows/build-wasm.yml) reprend le build Docker local :
+
+- **`workflow_dispatch`** → artifact Actions `occt-step-wasm` (`dist/`)
+- **tag `v*`** (ex. `v0.1.0`) → même artifact + GitHub Release avec le wasm, le JS, `link-libs.txt` et les licences
+
+Miroir hors `.github` : [`ci/build-wasm.yml`](ci/build-wasm.yml) (certains jetons sans scope `workflow` ne peuvent pas pousser sous `.github/workflows`). En cas d’écart, `.github/workflows` prime.
+
+Plan et sprint : [`docs/ci-release.md`](docs/ci-release.md), [`docs/sprint-ci-release.md`](docs/sprint-ci-release.md).
