@@ -53,3 +53,11 @@ Le workflow [`.github/workflows/build-wasm.yml`](.github/workflows/build-wasm.ym
 Miroir hors `.github` : [`ci/build-wasm.yml`](ci/build-wasm.yml) (certains jetons sans scope `workflow` ne peuvent pas pousser sous `.github/workflows`). En cas d’écart, `.github/workflows` prime.
 
 Plan et sprint : [`docs/ci-release.md`](docs/ci-release.md), [`docs/sprint-ci-release.md`](docs/sprint-ci-release.md).
+
+## Kernel de modélisation (évolution)
+
+En plus du lecteur STEP, le dépôt prévoit un second artefact `occt-kernel` : arena de shapes, primitives, extrude/booléens/fillet, tessellation, STEP/BREP en échange uniquement (l’historique paramétrique reste hors bande).
+
+- Plan : [`docs/occt-kernel.md`](docs/occt-kernel.md)
+- Contrat API : [`docs/kernel-api.md`](docs/kernel-api.md)
+- Sprint : [`docs/sprint-kernel.md`](docs/sprint-kernel.md)
