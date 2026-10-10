@@ -37,6 +37,10 @@ const required = [
   '_occt_boolean_fuse',
   '_occt_boolean_cut',
   '_occt_boolean_common',
+  '_occt_list_edges',
+  '_occt_list_faces',
+  '_occt_fillet_edges',
+  '_occt_chamfer_edges',
   '_occt_tessellate',
   '_occt_shape_release',
   '_occt_arena_clear',
@@ -114,6 +118,29 @@ if (!revolved) gaps.push('revolve returned 0');
 else {
   tessellate(revolved, 'revolve');
   occt._occt_shape_release(revolved);
+}
+
+// Fillet all edges of a box
+const filletBox = occt._occt_make_box(20, 20, 20);
+const edgePtr = filletBox ? occt._occt_list_edges(filletBox) : 0;
+if (edgePtr) {
+  const edgeJson = JSON.parse(occt.UTF8ToString(edgePtr));
+  occt._occt_free(edgePtr);
+  console.log('list_edges', { ok: edgeJson.ok, count: edgeJson.edges?.length ?? 0 });
+  if (!edgeJson.ok || !(edgeJson.edges?.length > 0)) gaps.push('list_edges failed');
+}
+const facePtr = filletBox ? occt._occt_list_faces(filletBox) : 0;
+if (facePtr) {
+  const faceJson = JSON.parse(occt.UTF8ToString(facePtr));
+  occt._occt_free(facePtr);
+  console.log('list_faces', { ok: faceJson.ok, count: faceJson.faces?.length ?? 0 });
+  if (!faceJson.ok || !(faceJson.faces?.length > 0)) gaps.push('list_faces failed');
+}
+const filleted = filletBox ? occt._occt_fillet_edges(filletBox, 1.0, 0, -1) : 0;
+if (!filleted) gaps.push('fillet_edges (all) returned 0');
+else {
+  tessellate(filleted, 'fillet-box');
+  occt._occt_shape_release(filleted);
 }
 
 if (box) occt._occt_shape_release(box);

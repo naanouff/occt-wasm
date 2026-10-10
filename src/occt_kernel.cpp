@@ -8,6 +8,7 @@
 #include "kernel/primitives.hpp"
 #include "kernel/solids.hpp"
 #include "kernel/tessellate.hpp"
+#include "kernel/topology.hpp"
 
 #include <Standard_Failure.hxx>
 #include <TopoDS_Shape.hxx>
@@ -59,6 +60,48 @@ uint32_t occt_boolean_fuse(uint32_t a, uint32_t b) { return occt_kernel::boolean
 uint32_t occt_boolean_cut(uint32_t a, uint32_t b) { return occt_kernel::booleanCut(a, b); }
 
 uint32_t occt_boolean_common(uint32_t a, uint32_t b) { return occt_kernel::booleanCommon(a, b); }
+
+char* occt_list_edges(uint32_t handle) {
+  try {
+    TopoDS_Shape shape;
+    if (!occt_kernel::arena().get(handle, shape)) {
+      return occt_kernel::errorJson("InvalidHandle", "unknown shape handle");
+    }
+    return occt_kernel::duplicate(occt_kernel::listEdgesJson(shape));
+  } catch (const Standard_Failure& failure) {
+    const char* msg = failure.GetMessageString();
+    return occt_kernel::errorJson("InternalError", msg ? msg : "Standard_Failure");
+  } catch (const std::exception& error) {
+    return occt_kernel::errorJson("InternalError", error.what());
+  } catch (...) {
+    return occt_kernel::errorJson("InternalError", "unknown");
+  }
+}
+
+char* occt_list_faces(uint32_t handle) {
+  try {
+    TopoDS_Shape shape;
+    if (!occt_kernel::arena().get(handle, shape)) {
+      return occt_kernel::errorJson("InvalidHandle", "unknown shape handle");
+    }
+    return occt_kernel::duplicate(occt_kernel::listFacesJson(shape));
+  } catch (const Standard_Failure& failure) {
+    const char* msg = failure.GetMessageString();
+    return occt_kernel::errorJson("InternalError", msg ? msg : "Standard_Failure");
+  } catch (const std::exception& error) {
+    return occt_kernel::errorJson("InternalError", error.what());
+  } catch (...) {
+    return occt_kernel::errorJson("InternalError", "unknown");
+  }
+}
+
+uint32_t occt_fillet_edges(uint32_t handle, double radius, const int32_t* indices, int indexCount) {
+  return occt_kernel::filletEdges(handle, radius, indices, indexCount);
+}
+
+uint32_t occt_chamfer_edges(uint32_t handle, double distance, const int32_t* indices, int indexCount) {
+  return occt_kernel::chamferEdges(handle, distance, indices, indexCount);
+}
 
 char* occt_tessellate(uint32_t handle, const char* preset) {
   try {

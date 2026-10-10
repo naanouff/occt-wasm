@@ -100,8 +100,10 @@ Pas de healing agressif en v1 : échec OCCT → `BooleanFailed`.
 
 | Symbole | Entrée | Sortie |
 |---------|--------|--------|
-| `_occt_fillet_edges` | handle, `radius`, indices d’arêtes ou mode `all` | handle |
-| `_occt_chamfer_edges` | handle, distance(s), indices ou `all` | handle |
+| `_occt_fillet_edges` | handle, `radius`, `indices*` (`int32`), `indexCount` (`<0` = all) | handle (entrée consommée) |
+| `_occt_chamfer_edges` | handle, `distance`, `indices*`, `indexCount` (`<0` = all) | handle (entrée consommée) |
+
+Les `id` renvoyés par `list_edges` / `list_faces` sont des indices **0-based** dans la shape courante uniquement. Après fillet/chamfer/booléen/extrude, re-lister sur le nouveau handle.
 
 ### Introspection (shape courante)
 
