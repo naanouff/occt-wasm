@@ -25,7 +25,7 @@ Milestone : [Sprint OCCT Kernel](https://github.com/naanouff/occt-wasm/milestone
 |---|-------|--------|-----------------|
 | K0 | [#7](https://github.com/naanouff/occt-wasm/issues/7) | Contrat API kernel | `docs/kernel-api.md` + `docs/occt-kernel.md` mergés ; README pointe dessus |
 | K1 | [#8](https://github.com/naanouff/occt-wasm/issues/8) | Arena + primitives + tessellate | Target `occt-kernel` ; smoke box→mesh ; `GAPS-kernel.md` |
-| K2 | [#9](https://github.com/naanouff/occt-wasm/issues/9) | Wire / extrude / revolve / booléens | Smoke profil→extrude→cut vert |
+| K2 | [#9](https://github.com/naanouff/occt-wasm/issues/9) | Wire / extrude / revolve / booléens | Smoke profil→extrude→cut vert (PR `feature/kernel-solids`) |
 | K3 | [#10](https://github.com/naanouff/occt-wasm/issues/10) | Fillet / chamfer + list edges/faces | Ops + doc indices shape-locaux |
 | K4 | [#11](https://github.com/naanouff/occt-wasm/issues/11) | STEP/BREP import-export | Échange uniquement ; doctrine rappelée README |
 | K5 | [#12](https://github.com/naanouff/occt-wasm/issues/12) | Packaging dual + CI/Release | `package.json` exports ; Release joint step+kernel |
