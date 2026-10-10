@@ -1,0 +1,5 @@
+# Shell/env files must stay LF so Docker `source` does not corrupt URLs on Windows checkouts.
+*.env text eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf
+Dockerfile.local text eol=lf
