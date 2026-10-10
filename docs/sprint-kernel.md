@@ -28,7 +28,7 @@ Milestone : [Sprint OCCT Kernel](https://github.com/naanouff/occt-wasm/milestone
 | K2 | [#9](https://github.com/naanouff/occt-wasm/issues/9) | Wire / extrude / revolve / booléens | Smoke profil→extrude→cut vert (PR `feature/kernel-solids`) |
 | K3 | [#10](https://github.com/naanouff/occt-wasm/issues/10) | Fillet / chamfer + list edges/faces | Ops + doc indices shape-locaux (PR `feature/kernel-fillet`) |
 | K4 | [#11](https://github.com/naanouff/occt-wasm/issues/11) | STEP/BREP import-export | Échange uniquement ; doctrine rappelée README (PR `feature/kernel-io`) |
-| K5 | [#12](https://github.com/naanouff/occt-wasm/issues/12) | Packaging dual + CI/Release | `package.json` exports ; Release joint step+kernel |
+| K5 | [#12](https://github.com/naanouff/occt-wasm/issues/12) | Packaging dual + CI/Release | `package.json` exports ; Release joint step+kernel (PR `feature/kernel-packaging`) |
 | K6 | [#13](https://github.com/naanouff/occt-wasm/issues/13) | Worker batch + typings + exemple | `examples/kernel-worker.mjs` ; mesures init/mémoire |
 
 ## Préparation locale (avant push)

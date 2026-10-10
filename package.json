@@ -1,7 +1,7 @@
 {
   "name": "@naanouff/occt-wasm",
   "version": "0.1.0",
-  "description": "OCCT 8 STEPCAF reader compiled to WebAssembly (mesh, assembly, PMI, GD&T, annotations).",
+  "description": "OCCT 8 WebAssembly: STEPCAF PMI reader (occt-step) and B-Rep modeling kernel (occt-kernel).",
   "license": "LGPL-2.1-only",
   "type": "module",
   "files": [
@@ -9,7 +9,9 @@
   ],
   "main": "dist/occt-step.js",
   "exports": {
-    ".": "./dist/occt-step.js"
+    ".": "./dist/occt-step.js",
+    "./step": "./dist/occt-step.js",
+    "./kernel": "./dist/occt-kernel.js"
   },
   "scripts": {
     "smoke": "node scripts/smoke.mjs",

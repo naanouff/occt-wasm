@@ -49,8 +49,10 @@ Détail : [`docs/gitflow.md`](docs/gitflow.md).
 
 Le workflow [`.github/workflows/build-wasm.yml`](.github/workflows/build-wasm.yml) reprend le build Docker local :
 
-- **`workflow_dispatch`** → artifact Actions `occt-step-wasm` (`dist/`)
-- **tag `v*`** (ex. `v0.1.0`) → même artifact + GitHub Release avec le wasm, le JS, `link-libs.txt` et les licences
+- **`workflow_dispatch`** → artifact Actions `occt-wasm` (`dist/`)
+- **tag `v*`** (ex. `v0.1.0`) → même artifact + GitHub Release avec `occt-step` + `occt-kernel`, `link-libs.txt` et les licences
+
+Imports npm : `@naanouff/occt-wasm/step` et `@naanouff/occt-wasm/kernel`.
 
 Miroir hors `.github` : [`ci/build-wasm.yml`](ci/build-wasm.yml) (certains jetons sans scope `workflow` ne peuvent pas pousser sous `.github/workflows`). En cas d’écart, `.github/workflows` prime.
 
