@@ -27,6 +27,7 @@ RUN set -eo pipefail \
   && source /emsdk/emsdk_env.sh \
   && export PATH="/emsdk/upstream/bin:${PATH}" \
   && set -u \
+  && sed -i 's/\r$//' /src/versions.env /src/scripts/*.sh \
   && source /src/versions.env \
   && git clone --depth 1 --branch "${OCCT_TAG}" "${OCCT_GIT_URL}" /src/OCCT \
   && test "$(git -C /src/OCCT rev-parse HEAD)" = "${OCCT_SHA}" \
