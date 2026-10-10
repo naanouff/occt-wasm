@@ -4,6 +4,7 @@
  */
 
 #include "kernel/arena.hpp"
+#include "kernel/io.hpp"
 #include "kernel/json_util.hpp"
 #include "kernel/primitives.hpp"
 #include "kernel/solids.hpp"
@@ -118,6 +119,22 @@ char* occt_tessellate(uint32_t handle, const char* preset) {
   } catch (...) {
     return occt_kernel::errorJson("InternalError", "unknown");
   }
+}
+
+uint32_t occt_import_brep(const uint8_t* bytes, int length) {
+  return occt_kernel::importBrep(bytes, length);
+}
+
+uint8_t* occt_export_brep(uint32_t handle, int* outLength) {
+  return occt_kernel::exportBrep(handle, outLength);
+}
+
+uint32_t occt_import_step(const uint8_t* bytes, int length) {
+  return occt_kernel::importStep(bytes, length);
+}
+
+uint8_t* occt_export_step(uint32_t handle, int* outLength) {
+  return occt_kernel::exportStep(handle, outLength);
 }
 
 }  // extern "C"
