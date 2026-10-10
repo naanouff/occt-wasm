@@ -6,6 +6,7 @@
 import { readFile, writeFile, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { runBatch } from '../js/kernel-batch.mjs';
 
 const dist = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const jsPath = join(dist, 'occt-kernel.js');
@@ -177,16 +178,33 @@ else {
 }
 if (ioBox) occt._occt_shape_release(ioBox);
 
+const batch = runBatch(occt, [
+  { op: 'make_box', args: [8, 9, 10], as: 'b' },
+  { op: 'fillet_edges', args: [{ handle: 'b' }, 0.5, null], as: 'f' },
+  { op: 'tessellate', args: [{ handle: 'f' }, 'coarse'], as: 'mesh' },
+  { op: 'shape_release', args: [{ handle: 'f' }] },
+]);
+console.log('batch', {
+  ok: batch.ok,
+  triangles: batch.aliases?.mesh?.triangleCount,
+  error: batch.error,
+});
+if (!batch.ok || !(batch.aliases?.mesh?.triangleCount > 0)) {
+  gaps.push(`runBatch failed (${batch.error ?? 'no triangles'})`);
+}
+
 if (box) occt._occt_shape_release(box);
 if (cut) occt._occt_shape_release(cut);
 occt._occt_arena_clear();
 
 const wasmStat = await stat(wasmPath);
+const heapBytes = occt.HEAPU8?.length ?? null;
 const report = [
   `# Smoke OCCT Kernel WASM`,
   ``,
   `- init: ${initMs} ms`,
   `- wasm: ${wasmStat.size} octets`,
+  `- heap (linear memory): ${heapBytes ?? '?'} octets`,
   ``,
   `## Écarts`,
   ``,

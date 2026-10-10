@@ -52,7 +52,8 @@ Le workflow [`.github/workflows/build-wasm.yml`](.github/workflows/build-wasm.ym
 - **`workflow_dispatch`** → artifact Actions `occt-wasm` (`dist/`)
 - **tag `v*`** (ex. `v0.1.0`) → même artifact + GitHub Release avec `occt-step` + `occt-kernel`, `link-libs.txt` et les licences
 
-Imports npm : `@naanouff/occt-wasm/step` et `@naanouff/occt-wasm/kernel`.
+Imports npm : `@naanouff/occt-wasm/step`, `@naanouff/occt-wasm/kernel`, `@naanouff/occt-wasm/kernel/batch`.  
+Worker d’exemple : [`examples/kernel-worker.mjs`](examples/kernel-worker.mjs). Typings : [`types/occt-kernel.d.ts`](types/occt-kernel.d.ts).
 
 Miroir hors `.github` : [`ci/build-wasm.yml`](ci/build-wasm.yml) (certains jetons sans scope `workflow` ne peuvent pas pousser sous `.github/workflows`). En cas d’écart, `.github/workflows` prime.
 

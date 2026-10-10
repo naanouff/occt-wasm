@@ -5,13 +5,21 @@
   "license": "LGPL-2.1-only",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "js",
+    "types",
+    "examples"
   ],
   "main": "dist/occt-step.js",
+  "types": "types/occt-kernel.d.ts",
   "exports": {
     ".": "./dist/occt-step.js",
     "./step": "./dist/occt-step.js",
-    "./kernel": "./dist/occt-kernel.js"
+    "./kernel": {
+      "types": "./types/occt-kernel.d.ts",
+      "default": "./dist/occt-kernel.js"
+    },
+    "./kernel/batch": "./js/kernel-batch.mjs"
   },
   "scripts": {
     "smoke": "node scripts/smoke.mjs",
