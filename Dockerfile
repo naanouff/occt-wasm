@@ -27,6 +27,7 @@ RUN set -eo pipefail \
   && source /emsdk/emsdk_env.sh \
   && export PATH="/emsdk/upstream/bin:${PATH}" \
   && set -u \
+  && sed -i 's/\r$//' /src/versions.env /src/scripts/*.sh \
   && source /src/versions.env \
   && git clone --depth 1 --branch "${OCCT_TAG}" "${OCCT_GIT_URL}" /src/OCCT \
   && test "$(git -C /src/OCCT rev-parse HEAD)" = "${OCCT_SHA}" \
@@ -45,8 +46,12 @@ RUN set -eo pipefail \
        -DOCCT_RES=/opt/occt-res \
   && cmake --build /build/api -j2 \
   && mkdir -p /opt/dist \
-  && cp /build/api/occt-step.js /build/api/occt-step.wasm /build/api/link-libs.txt /opt/dist/ \
+  && cp /build/api/occt-step.js /build/api/occt-step.wasm \
+       /build/api/occt-kernel.js /build/api/occt-kernel.wasm \
+       /build/api/link-libs.txt /opt/dist/ \
   && cp /src/OCCT/LICENSE_LGPL_21.txt /src/OCCT/OCCT_LGPL_EXCEPTION.txt /opt/dist/ \
   && wasm-opt -O1 /opt/dist/occt-step.wasm -o /tmp/occt-step.opt.wasm \
   && mv /tmp/occt-step.opt.wasm /opt/dist/occt-step.wasm \
+  && wasm-opt -O1 /opt/dist/occt-kernel.wasm -o /tmp/occt-kernel.opt.wasm \
+  && mv /tmp/occt-kernel.opt.wasm /opt/dist/occt-kernel.wasm \
   && ! grep -q TKOpenGl /opt/dist/link-libs.txt

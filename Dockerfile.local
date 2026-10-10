@@ -78,12 +78,20 @@ RUN --mount=type=bind,source=OCCT,target=/src/OCCT,rw \
       || { tail -n 120 /tmp/api-build.log; exit 1; }) \
   && echo "api build done" \
   && mkdir -p /opt/dist \
-  && cp /build/api/occt-step.js /build/api/occt-step.wasm /build/api/link-libs.txt /opt/dist/ \
+  && cp /build/api/occt-step.js /build/api/occt-step.wasm \
+       /build/api/occt-kernel.js /build/api/occt-kernel.wasm \
+       /build/api/link-libs.txt /opt/dist/ \
   && cp /src/OCCT/LICENSE_LGPL_21.txt /src/OCCT/OCCT_LGPL_EXCEPTION.txt /opt/dist/ \
   && if wasm-opt -O1 /opt/dist/occt-step.wasm -o /tmp/occt-step.opt.wasm; then \
        mv /tmp/occt-step.opt.wasm /opt/dist/occt-step.wasm; \
-       echo "wasm-opt -O1 applied"; \
+       echo "wasm-opt -O1 applied (step)"; \
      else \
-       echo "wasm-opt skipped"; \
+       echo "wasm-opt skipped (step)"; \
+     fi \
+  && if wasm-opt -O1 /opt/dist/occt-kernel.wasm -o /tmp/occt-kernel.opt.wasm; then \
+       mv /tmp/occt-kernel.opt.wasm /opt/dist/occt-kernel.wasm; \
+       echo "wasm-opt -O1 applied (kernel)"; \
+     else \
+       echo "wasm-opt skipped (kernel)"; \
      fi \
   && ! grep -q TKOpenGl /opt/dist/link-libs.txt

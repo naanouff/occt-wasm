@@ -1,0 +1,140 @@
+/**
+ * Modeling kernel: shape arena, primitives, tessellation.
+ * STEP PMI stays on occt-step; parametric history stays out of band.
+ */
+
+#include "kernel/arena.hpp"
+#include "kernel/io.hpp"
+#include "kernel/json_util.hpp"
+#include "kernel/primitives.hpp"
+#include "kernel/solids.hpp"
+#include "kernel/tessellate.hpp"
+#include "kernel/topology.hpp"
+
+#include <Standard_Failure.hxx>
+#include <TopoDS_Shape.hxx>
+
+#include <cstdint>
+#include <cstdlib>
+#include <exception>
+#include <string>
+
+extern "C" {
+
+void occt_shape_release(uint32_t handle) { occt_kernel::arena().release(handle); }
+
+void occt_arena_clear() { occt_kernel::arena().clear(); }
+
+void occt_free(void* pointer) { std::free(pointer); }
+
+uint32_t occt_make_box(double dx, double dy, double dz) { return occt_kernel::makeBox(dx, dy, dz); }
+
+uint32_t occt_make_cylinder(double radius, double height) {
+  return occt_kernel::makeCylinder(radius, height);
+}
+
+uint32_t occt_make_sphere(double radius) { return occt_kernel::makeSphere(radius); }
+
+uint32_t occt_make_cone(double r1, double r2, double height) {
+  return occt_kernel::makeCone(r1, r2, height);
+}
+
+uint32_t occt_make_wire_polyline(const double* xyz, int pointCount) {
+  return occt_kernel::makeWirePolyline(xyz, pointCount);
+}
+
+uint32_t occt_make_face_from_wire(uint32_t wireHandle) {
+  return occt_kernel::makeFaceFromWire(wireHandle);
+}
+
+uint32_t occt_extrude(uint32_t profileHandle, double dx, double dy, double dz) {
+  return occt_kernel::extrude(profileHandle, dx, dy, dz);
+}
+
+uint32_t occt_revolve(uint32_t profileHandle, double ox, double oy, double oz, double ax, double ay,
+                      double az, double angleRad) {
+  return occt_kernel::revolve(profileHandle, ox, oy, oz, ax, ay, az, angleRad);
+}
+
+uint32_t occt_boolean_fuse(uint32_t a, uint32_t b) { return occt_kernel::booleanFuse(a, b); }
+
+uint32_t occt_boolean_cut(uint32_t a, uint32_t b) { return occt_kernel::booleanCut(a, b); }
+
+uint32_t occt_boolean_common(uint32_t a, uint32_t b) { return occt_kernel::booleanCommon(a, b); }
+
+char* occt_list_edges(uint32_t handle) {
+  try {
+    TopoDS_Shape shape;
+    if (!occt_kernel::arena().get(handle, shape)) {
+      return occt_kernel::errorJson("InvalidHandle", "unknown shape handle");
+    }
+    return occt_kernel::duplicate(occt_kernel::listEdgesJson(shape));
+  } catch (const Standard_Failure& failure) {
+    const char* msg = failure.GetMessageString();
+    return occt_kernel::errorJson("InternalError", msg ? msg : "Standard_Failure");
+  } catch (const std::exception& error) {
+    return occt_kernel::errorJson("InternalError", error.what());
+  } catch (...) {
+    return occt_kernel::errorJson("InternalError", "unknown");
+  }
+}
+
+char* occt_list_faces(uint32_t handle) {
+  try {
+    TopoDS_Shape shape;
+    if (!occt_kernel::arena().get(handle, shape)) {
+      return occt_kernel::errorJson("InvalidHandle", "unknown shape handle");
+    }
+    return occt_kernel::duplicate(occt_kernel::listFacesJson(shape));
+  } catch (const Standard_Failure& failure) {
+    const char* msg = failure.GetMessageString();
+    return occt_kernel::errorJson("InternalError", msg ? msg : "Standard_Failure");
+  } catch (const std::exception& error) {
+    return occt_kernel::errorJson("InternalError", error.what());
+  } catch (...) {
+    return occt_kernel::errorJson("InternalError", "unknown");
+  }
+}
+
+uint32_t occt_fillet_edges(uint32_t handle, double radius, const int32_t* indices, int indexCount) {
+  return occt_kernel::filletEdges(handle, radius, indices, indexCount);
+}
+
+uint32_t occt_chamfer_edges(uint32_t handle, double distance, const int32_t* indices, int indexCount) {
+  return occt_kernel::chamferEdges(handle, distance, indices, indexCount);
+}
+
+char* occt_tessellate(uint32_t handle, const char* preset) {
+  try {
+    TopoDS_Shape shape;
+    if (!occt_kernel::arena().get(handle, shape)) {
+      return occt_kernel::errorJson("InvalidHandle", "unknown shape handle");
+    }
+    return occt_kernel::duplicate(occt_kernel::tessellateShape(shape, preset));
+  } catch (const Standard_Failure& failure) {
+    const char* msg = failure.GetMessageString();
+    return occt_kernel::errorJson("InternalError", msg ? msg : "Standard_Failure");
+  } catch (const std::exception& error) {
+    return occt_kernel::errorJson("InternalError", error.what());
+  } catch (...) {
+    return occt_kernel::errorJson("InternalError", "unknown");
+  }
+}
+
+uint32_t occt_import_brep(const uint8_t* bytes, int length) {
+  return occt_kernel::importBrep(bytes, length);
+}
+
+uint8_t* occt_export_brep(uint32_t handle, int* outLength) {
+  return occt_kernel::exportBrep(handle, outLength);
+}
+
+uint32_t occt_import_step(const uint8_t* bytes, int length) {
+  return occt_kernel::importStep(bytes, length);
+}
+
+uint8_t* occt_export_step(uint32_t handle, int* outLength) {
+  return occt_kernel::exportStep(handle, outLength);
+}
+
+}  // extern "C"

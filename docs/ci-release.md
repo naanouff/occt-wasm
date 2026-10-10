@@ -21,7 +21,7 @@ flowchart LR
 
 | Déclencheur | Sortie |
 |-------------|--------|
-| `workflow_dispatch` | Artifact Actions `occt-step-wasm` (validation / debug) |
+| `workflow_dispatch` | Artifact Actions `occt-wasm` (validation / debug) |
 | Push tag `v*` (ex. `v0.1.0`) sur un commit de **`main`** | Même artifact + **GitHub Release publiée** avec les fichiers `dist/` |
 
 Les tags hors `main` font échouer l’étape Release (voir [gitflow.md](gitflow.md)).
@@ -38,8 +38,8 @@ Le fichier [`ci/build-wasm.yml`](../ci/build-wasm.yml) est un miroir pour consul
 
 Joindre à la release :
 
-- `dist/occt-step.wasm`
-- `dist/occt-step.js`
+- `dist/occt-step.wasm` / `dist/occt-step.js`
+- `dist/occt-kernel.wasm` / `dist/occt-kernel.js`
 - `dist/link-libs.txt`
 - `dist/LICENSE_LGPL_21.txt`
 - `dist/OCCT_LGPL_EXCEPTION.txt`
