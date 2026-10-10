@@ -135,7 +135,25 @@ Schéma `meshes` aligné sur le reader STEP (positions, normals, indices, `face`
 
 ## Batch (Phase 6)
 
-`_occt_batch(jsonOps) → jsonResult` : tableau ordonné d’ops `{ "op", "args", "as"? }` pour réduire les allers-retours `postMessage`. Les handles intermédiaires restent dans l’arena ; `as` permet un alias logique côté hôte.
+Batch **côté JS** (équivalent documenté de `_occt_batch`) : [`js/kernel-batch.mjs`](../js/kernel-batch.mjs) exporté en `@naanouff/occt-wasm/kernel/batch`.
+
+```js
+import { runBatch } from '@naanouff/occt-wasm/kernel/batch';
+
+const out = runBatch(occt, [
+  { op: 'make_box', args: [10, 20, 30], as: 'body' },
+  { op: 'fillet_edges', args: [{ handle: 'body' }, 1.0, null], as: 'filleted' },
+  { op: 'tessellate', args: [{ handle: 'filleted' }, 'normal'], as: 'mesh' },
+]);
+```
+
+- Entrée : tableau ordonné `{ op, args?, as? }`.
+- Réfs handle : `{ handle: "alias" }` ou `{ handle: 3 }`.
+- Sortie : `{ ok, results, aliases }` ou `{ ok: false, error, code: "BatchFailed", results }`.
+- Une instance wasm = une arena ; un Worker = une instance (voir [`examples/kernel-worker.mjs`](../examples/kernel-worker.mjs)).
+- Typings : [`types/occt-kernel.d.ts`](../types/occt-kernel.d.ts).
+
+Mesures à noter dans `GAPS-kernel.md` après smoke : `init` ms, taille wasm, et côté Worker `heapBytes` via message `stats`.
 
 ## Invariants
 

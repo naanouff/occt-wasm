@@ -61,7 +61,7 @@ Hors scope de cette lib : GCS / sketches / feature tree. Le kernel accepte des *
 | 3 | Fillet / chamfer + list edges/faces | Indices shape-locaux documentés |
 | 4 | Import/export STEP + BREP | Échange / cache uniquement |
 | 5 | Packaging npm dual + CI/Release | Exports `./step` et `./kernel` ; release joint les deux |
-| 6 | Worker : batch ops, typings, exemple | Init / mémoire documentés |
+| 6 | Worker : batch JS, typings, exemple | `runBatch` + `examples/kernel-worker.mjs` ; init/heap dans GAPS |
 
 Ordre : `0 → 1 → 2 → 3 → 4 → 5 → 6`. Chaque phase = PR `feature/*` → `develop`, smoke vert.
 
