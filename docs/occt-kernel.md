@@ -67,7 +67,17 @@ Ordre : `0 → 1 → 2 → 3 → 4 → 5 → 6`. Chaque phase = PR `feature/*` �
 
 ## Budget taille
 
-Tracker dans `dist/GAPS-kernel.md`. Tant que le link reste « full `OpenCASCADE_LIBRARIES` », viser un kernel de l’ordre de 1.2–1.5× le wasm step actuel. Link sélectif par TK (`TKBO`, `TKFillet`, `TKPrim`, …) : optimisation ultérieure, hors chemin critique v1.
+Tracker dans `dist/GAPS-kernel.md` (écrit par `npm run smoke:kernel`).  
+Tant que le link reste « full `OpenCASCADE_LIBRARIES` », viser un kernel de l’ordre de **1.2–1.5×** le wasm step (`GAPS.md`). Link sélectif par TK (`TKBO`, `TKFillet`, `TKPrim`, …) : optimisation ultérieure, hors chemin critique v1.
+
+## Packaging
+
+```js
+import createOcctStep from '@naanouff/occt-wasm/step';
+import createOcctKernel from '@naanouff/occt-wasm/kernel';
+```
+
+Release `v*` joint step + kernel (voir [ci-release.md](ci-release.md)).
 
 ## Hors scope
 
