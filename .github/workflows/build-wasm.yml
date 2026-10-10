@@ -35,7 +35,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: occt-step-wasm
+          name: occt-wasm
           path: dist
           if-no-files-found: error
 
@@ -55,10 +55,12 @@ jobs:
           files: |
             dist/occt-step.wasm
             dist/occt-step.js
+            dist/occt-kernel.wasm
+            dist/occt-kernel.js
             dist/link-libs.txt
             dist/LICENSE_LGPL_21.txt
             dist/OCCT_LGPL_EXCEPTION.txt
           body: |
-            OCCT STEP wasm build `${{ github.sha }}`.
+            OCCT wasm build `${{ github.sha }}`.
 
-            Artefacts : `occt-step.wasm`, `occt-step.js`, licences LGPL.
+            Artefacts : `occt-step` (STEPCAF/PMI), `occt-kernel` (modeling), licences LGPL.
