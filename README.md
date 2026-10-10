@@ -31,9 +31,11 @@ docker build -f Dockerfile.local -t occt-wasm .
 
 ```bash
 node scripts/smoke.mjs chemin/nist_ctc_01_asme1_ap242-e1.stp chemin/autre.stp
+node scripts/smoke-kernel.mjs
 ```
 
-Le rapport `dist/GAPS.md` note la taille du wasm, le temps d’init, et les trous.
+Le rapport `dist/GAPS.md` note la taille du wasm step, le temps d’init, et les trous.  
+`dist/GAPS-kernel.md` fait de même pour `occt-kernel` (box → tessellate).
 
 ## Gitflow
 

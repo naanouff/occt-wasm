@@ -12,6 +12,7 @@
     ".": "./dist/occt-step.js"
   },
   "scripts": {
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:kernel": "node scripts/smoke-kernel.mjs"
   }
 }
