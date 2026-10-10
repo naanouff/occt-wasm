@@ -41,6 +41,10 @@ const required = [
   '_occt_list_faces',
   '_occt_fillet_edges',
   '_occt_chamfer_edges',
+  '_occt_import_brep',
+  '_occt_export_brep',
+  '_occt_import_step',
+  '_occt_export_step',
   '_occt_tessellate',
   '_occt_shape_release',
   '_occt_arena_clear',
@@ -142,6 +146,36 @@ else {
   tessellate(filleted, 'fillet-box');
   occt._occt_shape_release(filleted);
 }
+
+// BREP / STEP exchange round-trip (not a working document)
+const ioBox = occt._occt_make_box(5, 6, 7);
+const lenPtr = occt._malloc(4);
+const brepPtr = ioBox ? occt._occt_export_brep(ioBox, lenPtr) : 0;
+const brepLen = brepPtr ? occt.HEAP32[lenPtr >> 2] : 0;
+if (!brepPtr || !(brepLen > 0)) gaps.push('export_brep failed');
+else {
+  const brepBack = occt._occt_import_brep(brepPtr, brepLen);
+  occt._occt_free(brepPtr);
+  if (!brepBack) gaps.push('import_brep returned 0');
+  else {
+    tessellate(brepBack, 'brep-roundtrip');
+    occt._occt_shape_release(brepBack);
+  }
+}
+const stepPtr = ioBox ? occt._occt_export_step(ioBox, lenPtr) : 0;
+const stepLen = stepPtr ? occt.HEAP32[lenPtr >> 2] : 0;
+occt._free(lenPtr);
+if (!stepPtr || !(stepLen > 0)) gaps.push('export_step failed');
+else {
+  const stepBack = occt._occt_import_step(stepPtr, stepLen);
+  occt._occt_free(stepPtr);
+  if (!stepBack) gaps.push('import_step returned 0');
+  else {
+    tessellate(stepBack, 'step-roundtrip');
+    occt._occt_shape_release(stepBack);
+  }
+}
+if (ioBox) occt._occt_shape_release(ioBox);
 
 if (box) occt._occt_shape_release(box);
 if (cut) occt._occt_shape_release(cut);

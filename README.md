@@ -58,7 +58,8 @@ Plan et sprint : [`docs/ci-release.md`](docs/ci-release.md), [`docs/sprint-ci-re
 
 ## Kernel de modélisation (évolution)
 
-En plus du lecteur STEP, le dépôt prévoit un second artefact `occt-kernel` : arena de shapes, primitives, extrude/booléens/fillet, tessellation, STEP/BREP en échange uniquement (l’historique paramétrique reste hors bande).
+Second artefact `occt-kernel` : arena de shapes, primitives, extrude/booléens/fillet, tessellation.  
+**Doctrine** : l’historique paramétrique reste hors bande ; STEP/BREP via le kernel = import/export ou cache (ex. `.cadombrep`), jamais document de travail. Le lecteur `occt-step` reste la voie PMI.
 
 - Plan : [`docs/occt-kernel.md`](docs/occt-kernel.md)
 - Contrat API : [`docs/kernel-api.md`](docs/kernel-api.md)

@@ -126,10 +126,12 @@ Schéma `meshes` aligné sur le reader STEP (positions, normals, indices, `face`
 
 | Symbole | Entrée | Sortie |
 |---------|--------|--------|
-| `_occt_import_step` | bytes STEP | handle racine (géométrie ; PMI → `occt-step`) |
-| `_occt_export_step` | handle | bytes STEP (ptr + length ou JSON base64 — détail d’implémentation) |
-| `_occt_import_brep` | bytes BREP | handle |
-| `_occt_export_brep` | handle | bytes BREP |
+| `_occt_import_step` | `bytes`, `length` | handle racine (géométrie seule ; PMI → `occt-step`) |
+| `_occt_export_step` | handle, `int* outLength` | `uint8_t*` malloc’d STEP ; libérer avec `_occt_free` |
+| `_occt_import_brep` | `bytes`, `length` | handle |
+| `_occt_export_brep` | handle, `int* outLength` | `uint8_t*` malloc’d BREP ; libérer avec `_occt_free` |
+
+Échec I/O : handle `0` / pointeur `NULL` et `*outLength = 0`. Pas de consommation du handle à l’export.
 
 ## Batch (Phase 6)
 
