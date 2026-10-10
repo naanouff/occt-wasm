@@ -6,6 +6,7 @@
 #include "kernel/arena.hpp"
 #include "kernel/json_util.hpp"
 #include "kernel/primitives.hpp"
+#include "kernel/solids.hpp"
 #include "kernel/tessellate.hpp"
 
 #include <Standard_Failure.hxx>
@@ -35,6 +36,29 @@ uint32_t occt_make_sphere(double radius) { return occt_kernel::makeSphere(radius
 uint32_t occt_make_cone(double r1, double r2, double height) {
   return occt_kernel::makeCone(r1, r2, height);
 }
+
+uint32_t occt_make_wire_polyline(const double* xyz, int pointCount) {
+  return occt_kernel::makeWirePolyline(xyz, pointCount);
+}
+
+uint32_t occt_make_face_from_wire(uint32_t wireHandle) {
+  return occt_kernel::makeFaceFromWire(wireHandle);
+}
+
+uint32_t occt_extrude(uint32_t profileHandle, double dx, double dy, double dz) {
+  return occt_kernel::extrude(profileHandle, dx, dy, dz);
+}
+
+uint32_t occt_revolve(uint32_t profileHandle, double ox, double oy, double oz, double ax, double ay,
+                      double az, double angleRad) {
+  return occt_kernel::revolve(profileHandle, ox, oy, oz, ax, ay, az, angleRad);
+}
+
+uint32_t occt_boolean_fuse(uint32_t a, uint32_t b) { return occt_kernel::booleanFuse(a, b); }
+
+uint32_t occt_boolean_cut(uint32_t a, uint32_t b) { return occt_kernel::booleanCut(a, b); }
+
+uint32_t occt_boolean_common(uint32_t a, uint32_t b) { return occt_kernel::booleanCommon(a, b); }
 
 char* occt_tessellate(uint32_t handle, const char* preset) {
   try {

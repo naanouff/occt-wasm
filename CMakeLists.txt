@@ -50,17 +50,18 @@ target_link_options(occt-step PRIVATE
   "SHELL:--embed-file ${OCCT_RES}/SHMessage@/occt-res/SHMessage"
 )
 
-# --- occt-kernel: modeling arena (K1: primitives + tessellate) ---
+# --- occt-kernel: modeling arena (primitives, solids, tessellate) ---
 add_executable(occt-kernel
   src/occt_kernel.cpp
   src/kernel/arena.cpp
   src/kernel/primitives.cpp
+  src/kernel/solids.cpp
   src/kernel/tessellate.cpp
 )
 occt_wasm_link_common(occt-kernel)
 target_link_options(occt-kernel PRIVATE
   "-sEXPORT_NAME=createOcctKernel"
   "-sFILESYSTEM=0"
-  "-sEXPORTED_FUNCTIONS=['_occt_shape_release','_occt_arena_clear','_occt_free','_occt_make_box','_occt_make_cylinder','_occt_make_sphere','_occt_make_cone','_occt_tessellate','_malloc','_free']"
+  "-sEXPORTED_FUNCTIONS=['_occt_shape_release','_occt_arena_clear','_occt_free','_occt_make_box','_occt_make_cylinder','_occt_make_sphere','_occt_make_cone','_occt_make_wire_polyline','_occt_make_face_from_wire','_occt_extrude','_occt_revolve','_occt_boolean_fuse','_occt_boolean_cut','_occt_boolean_common','_occt_tessellate','_malloc','_free']"
   "-sEXPORTED_RUNTIME_METHODS=['UTF8ToString','HEAPU8','cwrap','ccall']"
 )

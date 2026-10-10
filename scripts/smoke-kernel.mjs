@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Smoke occt-kernel: box → tessellate → triangleCount > 0.
+ * Smoke occt-kernel: primitives + profil→extrude→cut → tessellate.
  * Writes dist/GAPS-kernel.md with init time and wasm size.
  */
 import { readFile, writeFile, stat } from 'node:fs/promises';
@@ -30,6 +30,13 @@ const required = [
   '_occt_make_cylinder',
   '_occt_make_sphere',
   '_occt_make_cone',
+  '_occt_make_wire_polyline',
+  '_occt_make_face_from_wire',
+  '_occt_extrude',
+  '_occt_revolve',
+  '_occt_boolean_fuse',
+  '_occt_boolean_cut',
+  '_occt_boolean_common',
   '_occt_tessellate',
   '_occt_shape_release',
   '_occt_arena_clear',
@@ -43,34 +50,74 @@ for (const name of required) {
 }
 
 const gaps = [];
-const box = occt._occt_make_box(10, 20, 30);
-if (!box) gaps.push('make_box returned 0');
 
-const preset = new TextEncoder().encode('normal');
-const presetPtr = occt._malloc(preset.length + 1);
-occt.HEAPU8.set(preset, presetPtr);
-occt.HEAPU8[presetPtr + preset.length] = 0;
-const outPtr = occt._occt_tessellate(box, presetPtr);
-occt._free(presetPtr);
-const json = JSON.parse(occt.UTF8ToString(outPtr));
-occt._occt_free(outPtr);
-
-console.log('box tessellate', {
-  handle: box,
-  ok: json.ok,
-  triangleCount: json.triangleCount,
-  meshes: json.meshes?.length ?? 0,
-});
-
-if (!json.ok || !(json.triangleCount > 0)) {
-  gaps.push(`tessellate failed (${json.error ?? 'triangleCount=0'}, code=${json.code ?? '?'})`);
+function tessellate(handle, label) {
+  const preset = new TextEncoder().encode('normal');
+  const presetPtr = occt._malloc(preset.length + 1);
+  occt.HEAPU8.set(preset, presetPtr);
+  occt.HEAPU8[presetPtr + preset.length] = 0;
+  const outPtr = occt._occt_tessellate(handle, presetPtr);
+  occt._free(presetPtr);
+  const json = JSON.parse(occt.UTF8ToString(outPtr));
+  occt._occt_free(outPtr);
+  console.log(label, {
+    handle,
+    ok: json.ok,
+    triangleCount: json.triangleCount,
+    meshes: json.meshes?.length ?? 0,
+  });
+  if (!json.ok || !(json.triangleCount > 0)) {
+    gaps.push(`${label}: tessellate failed (${json.error ?? 'triangleCount=0'})`);
+  }
+  return json;
 }
 
-const cyl = occt._occt_make_cylinder(5, 12);
-if (!cyl) gaps.push('make_cylinder returned 0');
-else occt._occt_shape_release(cyl);
+const box = occt._occt_make_box(10, 20, 30);
+if (!box) gaps.push('make_box returned 0');
+else tessellate(box, 'box');
 
-occt._occt_shape_release(box);
+// Rectangle in XY → face → extrude → cut cylinder
+const rect = new Float64Array([0, 0, 0, 40, 0, 0, 40, 30, 0, 0, 30, 0]);
+const xyzPtr = occt._malloc(rect.byteLength);
+occt.HEAPU8.set(new Uint8Array(rect.buffer, rect.byteOffset, rect.byteLength), xyzPtr);
+const wire = occt._occt_make_wire_polyline(xyzPtr, 4);
+occt._free(xyzPtr);
+if (!wire) gaps.push('make_wire_polyline returned 0');
+
+const face = wire ? occt._occt_make_face_from_wire(wire) : 0;
+if (!face) gaps.push('make_face_from_wire returned 0');
+
+const solid = face ? occt._occt_extrude(face, 0, 0, 8) : 0;
+if (!solid) gaps.push('extrude returned 0');
+
+const tool = occt._occt_make_cylinder(4, 20);
+if (!tool) gaps.push('make_cylinder (cut tool) returned 0');
+
+const cut = solid && tool ? occt._occt_boolean_cut(solid, tool) : 0;
+if (!cut) gaps.push('boolean_cut returned 0');
+else tessellate(cut, 'extrude-cut');
+
+// Revolve: half-disk rectangle around Y
+const profilePts = new Float64Array([10, 0, 0, 20, 0, 0, 20, 0, 5, 10, 0, 5]);
+const profilePtr = occt._malloc(profilePts.byteLength);
+occt.HEAPU8.set(
+  new Uint8Array(profilePts.buffer, profilePts.byteOffset, profilePts.byteLength),
+  profilePtr,
+);
+const revWire = occt._occt_make_wire_polyline(profilePtr, 4);
+occt._free(profilePtr);
+const revFace = revWire ? occt._occt_make_face_from_wire(revWire) : 0;
+const revolved = revFace
+  ? occt._occt_revolve(revFace, 0, 0, 0, 0, 1, 0, Math.PI * 2)
+  : 0;
+if (!revolved) gaps.push('revolve returned 0');
+else {
+  tessellate(revolved, 'revolve');
+  occt._occt_shape_release(revolved);
+}
+
+if (box) occt._occt_shape_release(box);
+if (cut) occt._occt_shape_release(cut);
 occt._occt_arena_clear();
 
 const wasmStat = await stat(wasmPath);
