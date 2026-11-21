@@ -78,12 +78,18 @@ std::string listEdgesJson(const TopoDS_Shape& shape) {
     const auto curve = BRep_Tool::Curve(edge, firstParam, lastParam);
     double length = 0;
     gp_Pnt mid(0, 0, 0);
+    gp_Pnt start(0, 0, 0);
+    gp_Pnt end(0, 0, 0);
+    bool line = false;
     if (!curve.IsNull()) {
       BRepAdaptor_Curve adaptor(edge);
       GProp_GProps props;
       // Length via GC - use adaptor mid parameter
       const double midParam = 0.5 * (adaptor.FirstParameter() + adaptor.LastParameter());
       mid = adaptor.Value(midParam);
+      start = adaptor.Value(adaptor.FirstParameter());
+      end = adaptor.Value(adaptor.LastParameter());
+      line = adaptor.GetType() == GeomAbs_Line;
       try {
         BRepGProp::LinearProperties(edge, props);
         length = props.Mass();
@@ -95,7 +101,9 @@ std::string listEdgesJson(const TopoDS_Shape& shape) {
     if (!first) out << ',';
     first = false;
     out << "{\"id\":" << (i - 1) << ",\"length\":" << length << ",\"midPoint\":[" << mid.X() << ','
-        << mid.Y() << ',' << mid.Z() << "]}";
+        << mid.Y() << ',' << mid.Z() << "],\"ends\":[" << start.X() << ',' << start.Y() << ','
+        << start.Z() << ',' << end.X() << ',' << end.Y() << ',' << end.Z()
+        << "],\"line\":" << (line ? "true" : "false") << '}';
   }
   out << "]}";
   return out.str();

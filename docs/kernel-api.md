@@ -82,9 +82,11 @@ Profil plan **XY** en v1 (wires déjà résolus par l’hôte).
 | Symbole | Entrée | Sortie |
 |---------|--------|--------|
 | `_occt_make_wire_polyline` | buffer `xyz` flat (N≥3, fermeture implicite si premier=dernier ou flag) | handle wire |
+| `_occt_make_wire_arcs` | buffer `xyz` flat (N≥3), `kinds*` int32 (un par point ; `1` = milieu de l’arc entre ses deux voisins, qui ne sont pas des milieux) | handle wire fermé |
 | `_occt_make_face_from_wire` | handle wire | handle face |
 | `_occt_extrude` | handle face/wire, `dx, dy, dz` | handle solid |
 | `_occt_revolve` | handle face/wire, axe `(ox,oy,oz, dx,dy,dz)`, `angleRad` | handle solid |
+| `_occt_sweep_helix` | handle wire fermé, axe `(ox,oy,oz, ax,ay,az)`, direction radiale `(xx,xy,xz)`, `radius`, `pitch` (`>0` = hélice à droite), `height` | handle solid (entrée consommée). Une arête d’hélice par tour |
 
 ### Booléens
 
@@ -111,7 +113,7 @@ Indices **locaux à la shape** ; invalidés après toute op qui produit un nouve
 
 | Symbole | Sortie JSON |
 |---------|-------------|
-| `_occt_list_edges` | `{ ok, edges: [{ id, length, midPoint: [x,y,z] }] }` |
+| `_occt_list_edges` | `{ ok, edges: [{ id, length, midPoint: [x,y,z], ends: [x0,y0,z0,x1,y1,z1], line }] }` |
 | `_occt_list_faces` | `{ ok, faces: [{ id, area, midPoint: [x,y,z] }] }` |
 
 ### Tessellation

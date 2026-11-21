@@ -64,7 +64,7 @@ occt_wasm_link_common(occt-kernel)
 target_link_options(occt-kernel PRIVATE
   "-sEXPORT_NAME=createOcctKernel"
   "-sFILESYSTEM=1"
-  "-sEXPORTED_FUNCTIONS=['_occt_shape_release','_occt_arena_clear','_occt_free','_occt_make_box','_occt_make_cylinder','_occt_make_sphere','_occt_make_cone','_occt_make_wire_polyline','_occt_make_face_from_wire','_occt_extrude','_occt_revolve','_occt_boolean_fuse','_occt_boolean_cut','_occt_boolean_common','_occt_list_edges','_occt_list_faces','_occt_fillet_edges','_occt_chamfer_edges','_occt_import_brep','_occt_export_brep','_occt_import_step','_occt_export_step','_occt_tessellate','_malloc','_free']"
+  "-sEXPORTED_FUNCTIONS=['_occt_shape_release','_occt_arena_clear','_occt_free','_occt_make_box','_occt_make_cylinder','_occt_make_sphere','_occt_make_cone','_occt_make_wire_polyline','_occt_make_wire_arcs','_occt_make_face_from_wire','_occt_extrude','_occt_revolve','_occt_sweep_helix','_occt_boolean_fuse','_occt_boolean_cut','_occt_boolean_common','_occt_list_edges','_occt_list_faces','_occt_fillet_edges','_occt_chamfer_edges','_occt_import_brep','_occt_export_brep','_occt_import_step','_occt_export_step','_occt_tessellate','_malloc','_free']"
   "-sEXPORTED_RUNTIME_METHODS=['UTF8ToString','HEAPU8','HEAP32','cwrap','ccall']"
   "SHELL:--embed-file ${OCCT_RES}/XSTEPResource@/occt-res/XSTEPResource"
   "SHELL:--embed-file ${OCCT_RES}/SHMessage@/occt-res/SHMessage"
