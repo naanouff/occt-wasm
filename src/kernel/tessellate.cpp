@@ -6,7 +6,19 @@
 #include <vector>
 
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
+#include <TopExp.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
+#include <TopTools_ListOfShape.hxx>
+#include <gp_Cone.hxx>
+#include <gp_Cylinder.hxx>
+#include <gp_Lin.hxx>
+#include <gp_Pln.hxx>
+#include <gp_Sphere.hxx>
+#include <gp_Torus.hxx>
+#include <numeric>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRep_Tool.hxx>
 #include <Bnd_Box.hxx>
@@ -31,6 +43,8 @@ namespace {
 
 struct MeshBuffers {
   int face = 0;
+  /** Carreau : faces voisines de même surface partagent ce numéro. */
+  int surface = 0;
   std::vector<double> positions;
   std::vector<double> normals;
   std::vector<int> indices;
@@ -139,6 +153,92 @@ void appendFaceMesh(const TopoDS_Face& face, int faceId, MeshBuffers& mesh) {
   }
 }
 
+constexpr double kLongueur = 1e-6;
+constexpr double kAngle = 1e-6;
+
+bool memeAxe(const gp_Ax1& a, const gp_Ax1& b) {
+  return a.IsParallel(b, kAngle) && gp_Lin(a).Distance(b.Location()) <= kLongueur;
+}
+
+/** Deux faces portées par la même surface : même poignée Geom, ou même surface analytique. */
+bool memeSurface(const TopoDS_Face& f1, const TopoDS_Face& f2) {
+  TopLoc_Location l1, l2;
+  const occ::handle<Geom_Surface> s1 = BRep_Tool::Surface(f1, l1);
+  const occ::handle<Geom_Surface> s2 = BRep_Tool::Surface(f2, l2);
+  if (!s1.IsNull() && s1 == s2 && l1.IsEqual(l2)) return true;
+  BRepAdaptor_Surface a(f1, false);
+  BRepAdaptor_Surface b(f2, false);
+  if (a.GetType() != b.GetType()) return false;
+  switch (a.GetType()) {
+    case GeomAbs_Plane: {
+      const gp_Pln p = a.Plane();
+      const gp_Pln q = b.Plane();
+      return p.Axis().IsParallel(q.Axis(), kAngle) && p.Distance(q.Location()) <= kLongueur;
+    }
+    case GeomAbs_Cylinder: {
+      const gp_Cylinder p = a.Cylinder();
+      const gp_Cylinder q = b.Cylinder();
+      return std::abs(p.Radius() - q.Radius()) <= kLongueur && memeAxe(p.Axis(), q.Axis());
+    }
+    case GeomAbs_Cone: {
+      const gp_Cone p = a.Cone();
+      const gp_Cone q = b.Cone();
+      return std::abs(p.SemiAngle() - q.SemiAngle()) <= kAngle && p.Apex().Distance(q.Apex()) <= kLongueur &&
+             memeAxe(p.Axis(), q.Axis());
+    }
+    case GeomAbs_Sphere: {
+      const gp_Sphere p = a.Sphere();
+      const gp_Sphere q = b.Sphere();
+      return std::abs(p.Radius() - q.Radius()) <= kLongueur && p.Location().Distance(q.Location()) <= kLongueur;
+    }
+    case GeomAbs_Torus: {
+      const gp_Torus p = a.Torus();
+      const gp_Torus q = b.Torus();
+      return std::abs(p.MajorRadius() - q.MajorRadius()) <= kLongueur &&
+             std::abs(p.MinorRadius() - q.MinorRadius()) <= kLongueur &&
+             p.Location().Distance(q.Location()) <= kLongueur && memeAxe(p.Axis(), q.Axis());
+    }
+    default:
+      return false;
+  }
+}
+
+/**
+ * Carreau de chaque face : les faces voisines portées par la même surface
+ * (deux moitiés d'un cylindre, une surface coupée par un booléen) n'en font qu'un.
+ * Leur couture devient intérieure au carreau ; il ne reste que les vraies arêtes,
+ * bords de congé compris.
+ */
+std::vector<int> carreaux(const TopoDS_Shape& shape, const TopTools_IndexedMapOfShape& faces) {
+  std::vector<int> parent(static_cast<size_t>(faces.Extent()));
+  std::iota(parent.begin(), parent.end(), 0);
+  auto racine = [&parent](int i) {
+    while (parent[static_cast<size_t>(i)] != i) {
+      parent[static_cast<size_t>(i)] = parent[static_cast<size_t>(parent[static_cast<size_t>(i)])];
+      i = parent[static_cast<size_t>(i)];
+    }
+    return i;
+  };
+  TopTools_IndexedDataMapOfShapeListOfShape voisines;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, voisines);
+  for (int e = 1; e <= voisines.Extent(); ++e) {
+    const TopTools_ListOfShape& liste = voisines.FindFromIndex(e);
+    if (liste.Extent() != 2) continue;
+    const TopoDS_Face& f1 = TopoDS::Face(liste.First());
+    const TopoDS_Face& f2 = TopoDS::Face(liste.Last());
+    const int i = faces.FindIndex(f1) - 1;
+    const int j = faces.FindIndex(f2) - 1;
+    if (i < 0 || j < 0 || i == j) continue;
+    try {
+      if (memeSurface(f1, f2)) parent[static_cast<size_t>(racine(i))] = racine(j);
+    } catch (const Standard_Failure&) {
+    }
+  }
+  std::vector<int> sortie(parent.size());
+  for (size_t i = 0; i < parent.size(); ++i) sortie[i] = racine(static_cast<int>(i));
+  return sortie;
+}
+
 }  // namespace
 
 Quality qualityFor(const char* preset) {
@@ -170,9 +270,13 @@ std::string tessellateShape(const TopoDS_Shape& shape, const char* preset) {
   std::vector<double> wireframe;
   int nextFace = 0;
   int triangleCount = 0;
-  for (TopExp_Explorer faces(shape, TopAbs_FACE); faces.More(); faces.Next()) {
+  TopTools_IndexedMapOfShape faces;
+  TopExp::MapShapes(shape, TopAbs_FACE, faces);
+  const std::vector<int> surfaces = carreaux(shape, faces);
+  for (int f = 1; f <= faces.Extent(); ++f) {
     MeshBuffers mesh;
-    appendFaceMesh(TopoDS::Face(faces.Current()), nextFace, mesh);
+    appendFaceMesh(TopoDS::Face(faces.FindKey(f)), nextFace, mesh);
+    mesh.surface = surfaces[static_cast<size_t>(f - 1)];
     if (mesh.indices.size() < 3) continue;
     triangleCount += static_cast<int>(mesh.indices.size() / 3);
     meshes.push_back(std::move(mesh));
@@ -197,7 +301,7 @@ std::string tessellateShape(const TopoDS_Shape& shape, const char* preset) {
   for (size_t m = 0; m < meshes.size(); ++m) {
     if (m) out << ',';
     const MeshBuffers& mesh = meshes[m];
-    out << "{\"face\":" << mesh.face << ",\"triangleCount\":" << (mesh.indices.size() / 3)
+    out << "{\"face\":" << mesh.face << ",\"surface\":" << mesh.surface << ",\"triangleCount\":" << (mesh.indices.size() / 3)
         << ",\"positions\":[";
     for (size_t i = 0; i < mesh.positions.size(); ++i) {
       if (i) out << ',';
