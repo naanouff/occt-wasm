@@ -11,6 +11,9 @@
 #include <BRep_Tool.hxx>
 #include <Bnd_Box.hxx>
 #include <GCPnts_QuasiUniformDeflection.hxx>
+#include <GeomLProp_SLProps.hxx>
+#include <Geom_Surface.hxx>
+#include <gp_Pnt2d.hxx>
 #include <Poly_Triangulation.hxx>
 #include <Standard_Failure.hxx>
 #include <TopExp_Explorer.hxx>
@@ -107,12 +110,29 @@ void appendFaceMesh(const TopoDS_Face& face, int faceId, MeshBuffers& mesh) {
       mesh.indices.push_back(nodeIndex - 1);
     }
   }
+  // Normale de la surface au nœud : deux faces tangentes ont la même de part et d'autre,
+  // ce qui permet à l'hôte de masquer leur arête. La moyenne des triangles donne le sens,
+  // et sert de repli aux points singuliers (sommet de cône).
+  TopLoc_Location surfaceLoc;
+  const occ::handle<Geom_Surface> surface = BRep_Tool::Surface(face, surfaceLoc);
+  const gp_Trsf surfaceTrsf = surfaceLoc.Transformation();
   mesh.normals.assign(static_cast<size_t>(nbNodes) * 3, 0.0);
   for (int i = 0; i < nbNodes; ++i) {
-    gp_Vec normal(normalSum[static_cast<size_t>(i) * 3], normalSum[static_cast<size_t>(i) * 3 + 1],
-                  normalSum[static_cast<size_t>(i) * 3 + 2]);
-    if (normalCount[static_cast<size_t>(i)] > 0 && normal.SquareMagnitude() > 1e-20) normal.Normalize();
-    else normal = gp_Vec(0, 0, 1);
+    gp_Vec moyenne(normalSum[static_cast<size_t>(i) * 3], normalSum[static_cast<size_t>(i) * 3 + 1],
+                   normalSum[static_cast<size_t>(i) * 3 + 2]);
+    if (normalCount[static_cast<size_t>(i)] > 0 && moyenne.SquareMagnitude() > 1e-20) moyenne.Normalize();
+    else moyenne = gp_Vec(0, 0, 1);
+    gp_Vec normal = moyenne;
+    if (!surface.IsNull() && tri->HasUVNodes()) {
+      const gp_Pnt2d uv = tri->UVNode(i + 1);
+      GeomLProp_SLProps props(surface, uv.X(), uv.Y(), 1, 1e-9);
+      if (props.IsNormalDefined()) {
+        gp_Vec exacte(props.Normal());
+        if (!surfaceLoc.IsIdentity()) exacte.Transform(surfaceTrsf);
+        if (exacte.Dot(moyenne) < 0) exacte.Reverse();
+        normal = exacte;
+      }
+    }
     mesh.normals[static_cast<size_t>(i) * 3] = normal.X();
     mesh.normals[static_cast<size_t>(i) * 3 + 1] = normal.Y();
     mesh.normals[static_cast<size_t>(i) * 3 + 2] = normal.Z();
@@ -135,7 +155,10 @@ std::string tessellateShape(const TopoDS_Shape& shape, const char* preset) {
   const Quality quality = qualityFor(preset);
   const std::string presetName = preset ? preset : "normal";
   try {
-    BRepMesh_IncrementalMesh mesher(shape, quality.linear, false, quality.angular, false);
+    // Flèche relative à la pièce, comme pour les arêtes : en absolu, une hélice
+    // se maille en dizaines de milliers de triangles.
+    BRepMesh_IncrementalMesh mesher(shape, edgeDeflection(shape, quality.linear), false,
+                                    quality.angular, false);
     mesher.Perform();
   } catch (const Standard_Failure& failure) {
     const char* msg = failure.GetMessageString();
