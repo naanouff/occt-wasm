@@ -43,6 +43,10 @@ uint32_t occt_make_wire_polyline(const double* xyz, int pointCount) {
   return occt_kernel::makeWirePolyline(xyz, pointCount);
 }
 
+uint32_t occt_make_wire_arcs(const double* xyz, int pointCount, const int32_t* kinds) {
+  return occt_kernel::makeWireArcs(xyz, pointCount, kinds);
+}
+
 uint32_t occt_make_face_from_wire(uint32_t wireHandle) {
   return occt_kernel::makeFaceFromWire(wireHandle);
 }
@@ -54,6 +58,13 @@ uint32_t occt_extrude(uint32_t profileHandle, double dx, double dy, double dz) {
 uint32_t occt_revolve(uint32_t profileHandle, double ox, double oy, double oz, double ax, double ay,
                       double az, double angleRad) {
   return occt_kernel::revolve(profileHandle, ox, oy, oz, ax, ay, az, angleRad);
+}
+
+uint32_t occt_sweep_helix(uint32_t profileHandle, double ox, double oy, double oz, double ax,
+                          double ay, double az, double xx, double xy, double xz, double radius,
+                          double pitch, double height) {
+  return occt_kernel::sweepHelix(profileHandle, ox, oy, oz, ax, ay, az, xx, xy, xz, radius, pitch,
+                                 height);
 }
 
 uint32_t occt_boolean_fuse(uint32_t a, uint32_t b) { return occt_kernel::booleanFuse(a, b); }

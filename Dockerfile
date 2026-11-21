@@ -2,9 +2,13 @@
 # Emscripten 3.1.64 crashes in wasm instruction selection or emits a br_table
 # the engine rejects. This image installs emsdk 6.0.11 from its git tag.
 # OCCT is cloned here and checked against OCCT_SHA in versions.env.
+# OCCT builds in its own layer, before the wrapper sources are copied:
+# editing src/ relinks the wrapper without recompiling OCCT.
 FROM debian:bookworm-slim
 
 SHELL ["/bin/bash", "-lc"]
+
+ARG JOBS=8
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -19,9 +23,8 @@ ENV EM_CONFIG=/emsdk/.emscripten
 ENV PATH="/emsdk:/emsdk/upstream/emscripten:/emsdk/upstream/bin:${PATH}"
 
 WORKDIR /src
-COPY versions.env CMakeLists.txt package.json /src/
+COPY versions.env /src/
 COPY scripts /src/scripts
-COPY src /src/src
 
 RUN set -eo pipefail \
   && source /emsdk/emsdk_env.sh \
@@ -32,19 +35,27 @@ RUN set -eo pipefail \
   && git clone --depth 1 --branch "${OCCT_TAG}" "${OCCT_GIT_URL}" /src/OCCT \
   && test "$(git -C /src/OCCT rev-parse HEAD)" = "${OCCT_SHA}" \
   && bash /src/scripts/configure-occt.sh \
-  && cmake --build /build/occt --target install -j2 \
-  && cmake_dir="$(find /opt/occt -name OpenCASCADEConfig.cmake | head -n 1)" \
-  && test -n "${cmake_dir}" \
+  && cmake --build /build/occt --target install -j"${JOBS}" \
+  && test -n "$(find /opt/occt -name OpenCASCADEConfig.cmake | head -n 1)" \
   && mkdir -p /opt/occt-res \
   && cp -a /src/OCCT/resources/XSTEPResource /opt/occt-res/XSTEPResource \
-  && cp -a /src/OCCT/resources/SHMessage /opt/occt-res/SHMessage \
+  && cp -a /src/OCCT/resources/SHMessage /opt/occt-res/SHMessage
+
+COPY CMakeLists.txt package.json /src/
+COPY src /src/src
+
+RUN set -eo pipefail \
+  && source /emsdk/emsdk_env.sh \
+  && export PATH="/emsdk/upstream/bin:${PATH}" \
+  && set -u \
+  && cmake_dir="$(find /opt/occt -name OpenCASCADEConfig.cmake | head -n 1)" \
   && emcmake cmake -S /src -B /build/api -G Ninja \
        -DCMAKE_BUILD_TYPE=Release \
        -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
        -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-O1" \
        -DOpenCASCADE_DIR="$(dirname "${cmake_dir}")" \
        -DOCCT_RES=/opt/occt-res \
-  && cmake --build /build/api -j2 \
+  && cmake --build /build/api -j"${JOBS}" \
   && mkdir -p /opt/dist \
   && cp /build/api/occt-step.js /build/api/occt-step.wasm \
        /build/api/occt-kernel.js /build/api/occt-kernel.wasm \

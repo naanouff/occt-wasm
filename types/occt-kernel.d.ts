@@ -22,6 +22,8 @@ export interface OcctKernelModule {
   _occt_make_sphere(radius: number): number;
   _occt_make_cone(r1: number, r2: number, height: number): number;
   _occt_make_wire_polyline(xyz: number, pointCount: number): number;
+  /** Closed wire of lines and three-point arcs; kinds[i] = 1 marks point i as an arc middle. */
+  _occt_make_wire_arcs(xyz: number, pointCount: number, kinds: number): number;
   _occt_make_face_from_wire(wireHandle: number): number;
   _occt_extrude(profile: number, dx: number, dy: number, dz: number): number;
   _occt_revolve(
@@ -33,6 +35,22 @@ export interface OcctKernelModule {
     ay: number,
     az: number,
     angleRad: number,
+  ): number;
+  /** Closed wire swept along a helix of axis (o, a) starting at o + radius·x; pitch > 0 = right-hand. */
+  _occt_sweep_helix(
+    profileWire: number,
+    ox: number,
+    oy: number,
+    oz: number,
+    ax: number,
+    ay: number,
+    az: number,
+    xx: number,
+    xy: number,
+    xz: number,
+    radius: number,
+    pitch: number,
+    height: number,
   ): number;
   _occt_boolean_fuse(a: number, b: number): number;
   _occt_boolean_cut(a: number, b: number): number;
@@ -66,9 +84,11 @@ export type KernelBatchOpName =
   | 'make_sphere'
   | 'make_cone'
   | 'make_wire_polyline'
+  | 'make_wire_arcs'
   | 'make_face_from_wire'
   | 'extrude'
   | 'revolve'
+  | 'sweep_helix'
   | 'boolean_fuse'
   | 'boolean_cut'
   | 'boolean_common'
